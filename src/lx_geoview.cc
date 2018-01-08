@@ -135,11 +135,13 @@ namespace xlingeo{
         CalcRotationMatrix(x_axis_angle_,y_axis_angle_,z_axis_angle_,rotation_order_,rotation_matrix_);
 
 #ifdef _EIGEN
-        EigenMatrixXd m = eigen_malloc_matrix_double(3,3);
-        memcpy(eigen_matrix_data_double(m),rotation_matrix_,9*sizeof(double));
-        eigen_matrix_transpose_double(m,m);
-        memcpy(rotation_matrix_inv_,eigen_matrix_data_double(m),9*sizeof(double));
-        eigen_free_matrix_double(m);
+        EigenMatrixXd m1 = eigen_malloc_matrix_double(3,3);
+        EigenMatrixXd m2 = eigen_malloc_matrix_double(3,3);
+        memcpy(eigen_matrix_data_double(m1),rotation_matrix_,9*sizeof(double));
+        eigen_matrix_transpose_double(m1,m2);
+        memcpy(rotation_matrix_inv_,eigen_matrix_data_double(m2),9*sizeof(double));
+        eigen_free_matrix_double(m1);
+        eigen_free_matrix_double(m2);
 #else
         MatrixTranspose(rotation_matrix_,rotation_matrix_inv_,3,3);
 #endif

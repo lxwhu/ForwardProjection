@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <limits>
+#include <iostream>
 #include <sys/stat.h>
 
 #include <glog/logging.h>
@@ -138,7 +139,7 @@ static bool ReadCameraFile(
 }
 
 static bool ReadPosFile(const char* lpstrFilePath, std::vector<PosData>& pos_data, const char* camera_tag, bool bangledegree){
-    const double degree_to_arc = 3.1415926/180;
+    double degree_to_arc = 3.1415926/180; if(bangledegree) degree_to_arc = 1;
     FILE* fp = fopen(lpstrFilePath,"r"); if(!fp) return false;
 
     char strline[512]; PosData data;
@@ -147,26 +148,24 @@ static bool ReadPosFile(const char* lpstrFilePath, std::vector<PosData>& pos_dat
             fgets(strline, 512, fp);
             if( sscanf(strline,"%s%lf%lf%lf%lf%lf%lf",data.name, &data.xs,&data.ys,&data.zs,&data.xangle,&data.yangle,&data.zangle) < 7) continue;
             if(!strstr(data.name,camera_tag)) continue;
-            if(bangledegree) {
-                data.xangle *= degree_to_arc;
-                data.yangle *= degree_to_arc;
-                data.zangle *= degree_to_arc;
-            }
             pos_data.push_back(data);
         }while(!feof(fp));
     }else{
         do{
             fgets(strline, 512, fp);
             if( sscanf(strline,"%s%lf%lf%lf%lf%lf%lf",data.name, &data.xs,&data.ys,&data.zs,&data.xangle,&data.yangle,&data.zangle) < 7) continue;
-            if(bangledegree) {
-                data.xangle *= degree_to_arc;
-                data.yangle *= degree_to_arc;
-                data.zangle *= degree_to_arc;
-            }
             pos_data.push_back(data);
         }while(!feof(fp));
     }
     fclose(fp);
+
+    int sz = (int) pos_data.size();
+    PosData* pData = pos_data.data();
+    for (int i = 0; i < sz; pData++,++i) {
+        pData->xangle = -pData->xangle*degree_to_arc;
+        pData->yangle = -pData->yangle*degree_to_arc;
+        pData->zangle = -pData->zangle*degree_to_arc;
+    }
     return pos_data.size()>0;
 }
 static bool ReadPoint3dFile(const char* lpstrFilePath, std::vector<Point3D>& point3d){
@@ -251,10 +250,11 @@ int main(int argc, char *argv[])
     int point3d_size = (int)point3d.size();
     VLOG(1)<< "3D point num = "<< point3d.size();
 
+    VLOG(1)<< "Forward project all 3D point to images ...";
     PosData* pData = pos_data.data();
     for (int i = 0; i < pos_data_size ; pData++, ++i)
     {
-        VLOG(0)<< "["<<pData->name<<"]";
+        std::cout<< "["<<pData->name<<"]"<<std::endl;
         int pt_count = 0;
         geoview.set_exterior_parameters(pData->xs,pData->ys,pData->zs,pData->xangle,pData->yangle, pData->zangle, PosData::rotation_order);
         Point3D* pPoint = point3d.data();
@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
             geoview.WorldCoordsToPixelCoords(pPoint->x,pPoint->y,pPoint->z,&px,&py);
             if (px>-tolerance_distance&&px<width+tolerance_distance
                 &&py>-tolerance_distance&&py<height+tolerance_distance) {
-                VLOG(0)<< pPoint->name<<"\t\t"<< px<< "\t\t"<<py;
+                std::cout<< pPoint->name<<"\t\t"<< px<< "\t\t"<<py<<std::endl;
                 pt_count++;
             }
         }
