@@ -162,9 +162,9 @@ static bool ReadPosFile(const char* lpstrFilePath, std::vector<PosData>& pos_dat
     int sz = (int) pos_data.size();
     PosData* pData = pos_data.data();
     for (int i = 0; i < sz; pData++,++i) {
-        pData->xangle = -pData->xangle*degree_to_arc;
+        pData->xangle = pData->xangle*degree_to_arc;
         pData->yangle = -pData->yangle*degree_to_arc;
-        pData->zangle = -pData->zangle*degree_to_arc;
+        pData->zangle = pData->zangle*degree_to_arc;
     }
     return pos_data.size()>0;
 }
@@ -173,7 +173,9 @@ static bool ReadPoint3dFile(const char* lpstrFilePath, std::vector<Point3D>& poi
     char strline[512]; Point3D data;
     do{
         fgets(strline,512,fp);
-        if( sscanf(strline,"%s%lf%lf%*lf%*lf%*lf%*lf%lf",data.name, &data.y,&data.x,&data.z) < 4) continue;
+//        if( sscanf(strline,"%s%lf%lf%*lf%*lf%*lf%*lf%lf",data.name, &data.y,&data.x,&data.z) < 4) continue;
+        if( sscanf(strline,"%s%lf%lf%lf",data.name, &data.x,&data.y,&data.z) < 4) continue;
+        data.z = 30;
         point3d.push_back(data);
     }while(!feof(fp));
 
@@ -256,7 +258,9 @@ int main(int argc, char *argv[])
     {
         std::cout<< "["<<pData->name<<"]"<<std::endl;
         int pt_count = 0;
-        geoview.set_exterior_parameters(pData->xs,pData->ys,pData->zs,pData->xangle,pData->yangle, pData->zangle, PosData::rotation_order);
+        double rot_mat[9];
+        xlingeo::CalcRotationMatrix(pData->xangle,pData->yangle, pData->zangle, PosData::rotation_order, rot_mat);
+        geoview.set_exterior_parameters(pData->xs,pData->ys,pData->zs, rot_mat, false);
         Point3D* pPoint = point3d.data();
         for (int j = 0; j < point3d_size;pPoint++, ++j)
         {

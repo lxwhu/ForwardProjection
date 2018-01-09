@@ -119,6 +119,11 @@ namespace xlingeo{
         exterior_parameters_.set_orientation(xangle,yangle,zangle,rotation_order);
         return true;
     }
+    bool GeoView::set_exterior_parameters(double xs, double ys, double zs, double rotation_matrix[9], bool bworldtocamera ){
+        exterior_parameters_.set_position(xs,ys,zs);
+        exterior_parameters_.set_rotation_matrix(rotation_matrix,bworldtocamera);
+        return true;
+    }
     void GeoView::WorldCoordsToPixelCoords(double wx,double wy, double wz, double* px, double* py){
         double cxyz[3];
         exterior_parameters_.WorldCoordsToCameraCoordVec(wx,wy,wz,cxyz,cxyz+1,cxyz+2);
@@ -131,19 +136,25 @@ namespace xlingeo{
         memcpy(rotation_matrix_,kIdentityMatrix,9*sizeof(double));
         memcpy(rotation_matrix_inv_,kIdentityMatrix,9*sizeof(double));
     };
-    void GeoView::Exterior::UpdateRotationMatrix(){
-        CalcRotationMatrix(x_axis_angle_,y_axis_angle_,z_axis_angle_,rotation_order_,rotation_matrix_);
+    void GeoView::Exterior::set_rotation_matrix(double rotation_matrix[9], bool bworldtocamera){
+        double *rot_mat, *rot_mat_inv;
+        if(bworldtocamera) {
+            rot_mat = rotation_matrix_; rot_mat_inv = rotation_matrix_inv_;
+        }else{
+            rot_mat = rotation_matrix_inv_; rot_mat_inv = rotation_matrix_;
+        }
+        memcpy(rot_mat,rotation_matrix,9*sizeof(double));
 
 #ifdef _EIGEN
         EigenMatrixXd m1 = eigen_malloc_matrix_double(3,3);
         EigenMatrixXd m2 = eigen_malloc_matrix_double(3,3);
         memcpy(eigen_matrix_data_double(m1),rotation_matrix_,9*sizeof(double));
         eigen_matrix_transpose_double(m1,m2);
-        memcpy(rotation_matrix_inv_,eigen_matrix_data_double(m2),9*sizeof(double));
+        memcpy(rot_mat_inv,eigen_matrix_data_double(m2),9*sizeof(double));
         eigen_free_matrix_double(m1);
         eigen_free_matrix_double(m2);
 #else
-        MatrixTranspose(rotation_matrix_,rotation_matrix_inv_,3,3);
+        MatrixTranspose(rot_mat,rot_mat_inv,3,3);
 #endif
     }
     void GeoView::Exterior::WorldCoordsToCameraCoordVec(double wx, double wy, double wz, double *cx, double *cy, double *cz){

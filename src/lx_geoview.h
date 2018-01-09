@@ -12,6 +12,7 @@ namespace xlingeo{
 
         bool set_camera_parameters(double focal_length, double x0, double y0, int width, int height);
         bool set_exterior_parameters(double xs, double ys, double zs, double xangle, double yangle, double zangle, unsigned int rotation_order[3]);
+        bool set_exterior_parameters(double xs, double ys, double zs, double rotation_matrix[9], bool bworldtocamera = true );
 
         void WorldCoordsToPixelCoords(double wx,double wy, double wz, double* px, double* py);
     protected:
@@ -27,8 +28,12 @@ namespace xlingeo{
                 rotation_order_[0] = rotation_order[0];
                 rotation_order_[1] = rotation_order[1];
                 rotation_order_[2] = rotation_order[2];
-                UpdateRotationMatrix();
+
+                double rotation_matrix[9];
+                CalcRotationMatrix(x_axis_angle_,y_axis_angle_,z_axis_angle_,rotation_order_,rotation_matrix);
+                set_rotation_matrix(rotation_matrix);
             }
+            void set_rotation_matrix(double rotation_matrix[9], bool bworldtocamera = true);
 
             double x_axis_angle() const  { return x_axis_angle_; }
             double y_axis_angle() const  { return y_axis_angle_; }
@@ -43,8 +48,6 @@ namespace xlingeo{
             void xs_viewpoint(int a) { xs_viewpoint_ = a; }
             void ys_viewpoint(int a) { ys_viewpoint_ = a; }
             void zs_viewpoint(int a) { zs_viewpoint_ = a; }
-
-            void UpdateRotationMatrix();
 
             void WorldCoordsToCameraCoordVec(double wx, double wy, double wz, double *cx, double *cy, double *cz);
             void CameraCoordVecToWorldCoords(double cx, double cy, double cz, double wz, double *wx, double *wy);
