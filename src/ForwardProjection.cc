@@ -4,6 +4,7 @@
 #include <vector>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <sys/stat.h>
 
 #include <glog/logging.h>
@@ -33,31 +34,63 @@ static inline const char* strfilename(const char* path){
     return pr;
 }
 
+#ifdef _WIN32
+#define ISDIR(statbuf) (statbuf.st_mode & _S_IFDIR) != 0
+#define ISREG(statbuf) (statbuf.st_mode & _S_IFREG) != 0;
+#else
+#define ISDIR(statbuf) S_ISDIR(statbuf.st_mode)
+#define ISREG(statbuf) S_ISREG(statbuf.st_mode)
+#endif
+
+
 static inline int IsDirectory(const char *path) {
     struct stat statbuf;
     if (stat(path, &statbuf) != 0)
         return 0;
-#ifdef _WIN32
-    return (statbuf.st_mode & _S_IFDIR) != 0;
-#else
-    return S_ISDIR(statbuf.st_mode);
-#endif
+    return ISDIR(statbuf);
 }
 static inline int IsFile(const char *path) {
     struct stat statbuf;
     if (stat(path, &statbuf) != 0)
         return 0;
-#ifdef _WIN32
-    return (statbuf.st_mode & _S_IFREG) != 0;
-#else
-    return S_ISREG(statbuf.st_mode);
-#endif
+    return ISREG(statbuf);
 }
 
 static inline bool IsExist (const char* name) {
     struct stat buffer;
     return (stat (name, &buffer) == 0);
 }
+
+static inline char* AddPathMark(char* path){
+    int length = strlen(path);
+    char* p = path+length-1;
+    if(*p=='/'||*p=='\\') return p;
+    *(p+1) = '/'; *(p+2)=0;
+    return p+1;
+}
+
+#ifdef _WIN32
+#include <windows.h>
+static inline bool CreateDir(const char* path){
+    WIN32_FIND_DATA fd; HANDLE hFind = ::FindFirstFile(path,&fd);
+    if ( hFind!=INVALID_HANDLE_VALUE ){ ::FindClose(hFind); ::CreateDirectory(path,NULL); return true; }
+    char strPath[512]; strcpy( strPath,path);
+    char* pSplit = strfilename(strPath);
+    if ( !pSplit ) return true; else *pSplit = 0;
+    if ( !CreateDir(strPath) ) return false;
+    return ::CreateDirectory(path,NULL);
+}
+#else
+static inline bool CreateDir(const char* path){
+    char strPath[512],*pSplit;
+    if ( IsExist(path) ) return true;
+    pSplit = (char*)strfilename(strPath);
+
+    if ( !pSplit ) return true; else *pSplit = 0;
+    if ( !CreateDir(strPath) ) return false;
+    return (mkdir( path,S_IRWXU )==0);
+}
+#endif
 
 static bool ValidateFile(const char* flagname, const std::string& value) {
     if (IsExist(value.c_str()))
@@ -173,7 +206,7 @@ static bool ReadPoint3dFile(const char* lpstrFilePath, std::vector<Point3D>& poi
     char strline[512]; Point3D data;
     do{
         fgets(strline,512,fp);
-//        if( sscanf(strline,"%s%lf%lf%*lf%*lf%*lf%*lf%lf",data.name, &data.y,&data.x,&data.z) < 4) continue;
+//        if( sscanf(strline,"%s%lf%lf%*lf%*lf%*lf%*lf%*lf%lf",data.name, &data.y,&data.x,&data.z) < 4) continue;
         if( sscanf(strline,"%s%lf%lf%lf",data.name, &data.x,&data.y,&data.z) < 4) continue;
         data.z = 30;
         point3d.push_back(data);
@@ -252,11 +285,34 @@ int main(int argc, char *argv[])
     int point3d_size = (int)point3d.size();
     VLOG(1)<< "3D point num = "<< point3d.size();
 
+    char output_filepath[512];
+    const char* lpstroutpath = FLAGS_output.c_str(); char* output_filename = NULL;
+    std::ofstream output_file; std::ostream* out_info = &std::cout; std::ios_base::openmode file_mode = std::ofstream::out | std::ofstream::app;
+    if( strlen(lpstroutpath) == 0 ) {
+        if( IsDirectory(lpstroutpath) ){
+            strcpy(output_filepath,lpstroutpath); lpstroutpath = output_filepath;
+            output_filename =  AddPathMark(output_filepath)+1;
+        }else{
+            output_file.open(lpstroutpath,file_mode);
+            if(output_file.is_open()){
+                out_info = &output_file;
+            }else lpstroutpath = NULL;
+        }
+    }else{ lpstroutpath = NULL; }
+
     VLOG(1)<< "Forward project all 3D point to images ...";
     PosData* pData = pos_data.data();
     for (int i = 0; i < pos_data_size ; pData++, ++i)
     {
-        std::cout<< "["<<pData->name<<"]"<<std::endl;
+        if(output_filename) {
+            strcpy(output_filename,pData->name);
+            output_file.open(lpstroutpath,file_mode);
+            if(output_file.is_open()){
+                out_info = &output_file;
+            }else out_info = &std::cout;
+        }
+        else *out_info<< "["<<pData->name<<"]"<<std::endl;
+
         int pt_count = 0;
         double rot_mat[9];
         xlingeo::CalcRotationMatrix(pData->xangle,pData->yangle, pData->zangle, PosData::rotation_order, rot_mat);
@@ -268,11 +324,17 @@ int main(int argc, char *argv[])
             geoview.WorldCoordsToPixelCoords(pPoint->x,pPoint->y,pPoint->z,&px,&py);
             if (px>-tolerance_distance&&px<width+tolerance_distance
                 &&py>-tolerance_distance&&py<height+tolerance_distance) {
-                std::cout<< pPoint->name<<"\t\t"<< px<< "\t\t"<<py<<std::endl;
+                *out_info<< pPoint->name<<"\t\t"<< px<< "\t\t"<< height-1 - py<< "\t\t"<<py <<std::endl;
                 pt_count++;
             }
+        }
+        if(output_filename) {
+            output_file.close();
         }
     }
 
     return 0;
 }
+
+#undef ISDIR
+#undef ISREG
