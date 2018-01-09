@@ -288,7 +288,7 @@ int main(int argc, char *argv[])
     char output_filepath[512];
     const char* lpstroutpath = FLAGS_output.c_str(); char* output_filename = NULL;
     std::ofstream output_file; std::ostream* out_info = &std::cout; std::ios_base::openmode file_mode = std::ofstream::out | std::ofstream::app;
-    if( strlen(lpstroutpath) == 0 ) {
+    if( strlen(lpstroutpath)>0 ) {
         if( IsDirectory(lpstroutpath) ){
             strcpy(output_filepath,lpstroutpath); lpstroutpath = output_filepath;
             output_filename =  AddPathMark(output_filepath)+1;
@@ -299,13 +299,14 @@ int main(int argc, char *argv[])
             }else lpstroutpath = NULL;
         }
     }else{ lpstroutpath = NULL; }
+    VLOG(1)<< "output type = "<< std::string(lpstroutpath?(output_filename?"directory":"file"):"cout");
 
     VLOG(1)<< "Forward project all 3D point to images ...";
     PosData* pData = pos_data.data();
     for (int i = 0; i < pos_data_size ; pData++, ++i)
     {
         if(output_filename) {
-            strcpy(output_filename,pData->name);
+            sprintf(output_filename,"%s.txt",pData->name);
             output_file.open(lpstroutpath,file_mode);
             if(output_file.is_open()){
                 out_info = &output_file;
@@ -330,6 +331,7 @@ int main(int argc, char *argv[])
         }
         if(output_filename) {
             output_file.close();
+            if(pt_count==0) std::remove(output_filepath);
         }
     }
 
