@@ -15,6 +15,7 @@ namespace xlingeo{
         bool set_exterior_parameters(double xs, double ys, double zs, double rotation_matrix[9], bool bworldtocamera = true );
 
         void WorldCoordsToPixelCoords(double wx,double wy, double wz, double* px, double* py);
+        void PixelCoordsToWorldCoords(double px,double py, double wz, double* wx, double* wy);
     protected:
         class Exterior{
         public:

@@ -1,14 +1,15 @@
 #include "lx_geoview.h"
 #include "lx_camera.h"
 
+#include <assert.h>
+#include <memory.h>
+#include <math.h>
+
 //#define _EIGEN
 
 #ifdef _EIGEN
 #include "Eigen/eigen.h"
 #else
-#include <assert.h>
-#include <math.h>
-#include <memory.h>
 static inline void MatrixTranspose(const double* MatrixOrigin, double* MatrixNew, int m, int n)
 {
     int i;
@@ -83,7 +84,7 @@ namespace xlingeo{
         eigen_matrix_multiply_double(m3[rotation_order_list[2]],m3[rotation_order_list[1]],m3[3]);
         eigen_matrix_multiply_double(m3[3],m3[rotation_order_list[0]],m3[rotation_order_list[2]]);
 
-        memcpy(rotation_matrix,m3[rotation_order_list[2]],9*sizeof(double));
+        memcpy(rotation_matrix,eigen_matrix_data_double(m3[rotation_order_list[2]]),9*sizeof(double));
 
         eigen_free_matrix_double(m3[0]);
         eigen_free_matrix_double(m3[1]);
@@ -128,6 +129,11 @@ namespace xlingeo{
         double cxyz[3];
         exterior_parameters_.WorldCoordsToCameraCoordVec(wx,wy,wz,cxyz,cxyz+1,cxyz+2);
         camera_ptr_->CameraCoordVecToPixelCoords(cxyz[0],cxyz[1],cxyz[2],px,py);
+    }
+    void GeoView::PixelCoordsToWorldCoords(double px,double py, double wz, double* wx, double* wy){
+        double xyz[3];
+        camera_ptr_->PixelCoordsToCameraCoordVec(px,py,xyz,xyz+1,xyz+2);
+        exterior_parameters_.CameraCoordVecToWorldCoords(*xyz,*(xyz+1),*(xyz+2),wz,wx,wy);
     }
     GeoView::Exterior::Exterior() :
         x_axis_angle_(0), y_axis_angle_(0), z_axis_angle_(0),
@@ -200,8 +206,8 @@ namespace xlingeo{
         MatrixMultiply(rotation_matrix_inv_,cxyz,wxyz,3,3,1);
 #endif
         double tmp = (wz-zs_viewpoint_)/ *(wxyz+2);
-        *wx = *(wxyz)/tmp+xs_viewpoint_;
-        *wy = *(wxyz+1)/tmp+ys_viewpoint_;
+        *wx = *(wxyz)*tmp+xs_viewpoint_;
+        *wy = *(wxyz+1)*tmp+ys_viewpoint_;
     }
 }
 
